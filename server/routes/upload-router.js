@@ -102,7 +102,9 @@ router.post('/image', async (req, res) => {
 
     // Return full backend URL for frontend use
     const relativePath = `/assets/images/${type}/${fileName}`;
-    const backendUrl = `http://localhost:3000${relativePath}`;
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const backendUrl = `${protocol}://${host}${relativePath}`;
 
     res.status(201).json({
       success: true,
