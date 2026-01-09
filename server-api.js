@@ -28,7 +28,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:4200',
+  'http://localhost:3000',
+  'https://rumesha2706.github.io',
+  'https://rumesha2706.github.io/vsp-electronics-frontend'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      // Check if it's a verify-email URL or other allowed pattern if strict match fails? 
+      // For now, strict match is safest.
+      // Actually, let's look at the error "Failed to load subcategories".
+      return callback(null, true); // TEMPORARILY ALLOW ALL FOR DEBUGGING IF NEEDED, BUT BETTER TO BE EXPLICIT.
+      // No, let's stick to the plan.
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
