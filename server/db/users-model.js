@@ -203,6 +203,14 @@ async function getAllUsers(limit = 100, offset = 0) {
   return res.rows;
 }
 
+async function deleteUser(id) {
+  const res = await db.query(
+    'DELETE FROM users WHERE id = $1 RETURNING id',
+    [id]
+  );
+  return res.rows[0];
+}
+
 module.exports = {
   createTable,
   createUser,
@@ -215,5 +223,6 @@ module.exports = {
   setResetToken,
   resetPassword,
   getUserByPhone,
-  getAllUsers
+  getAllUsers,
+  deleteUser
 };

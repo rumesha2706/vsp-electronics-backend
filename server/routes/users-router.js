@@ -59,7 +59,7 @@ router.post('/admin/create', authenticateToken, authenticateAdmin, async (req, r
     });
   } catch (error) {
     console.error('Error creating user:', error);
-    
+
     if (error.code === '23505') {
       // Unique violation error
       return res.status(400).json({
@@ -67,7 +67,7 @@ router.post('/admin/create', authenticateToken, authenticateAdmin, async (req, r
         error: 'Email already exists'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to create user'
@@ -169,6 +169,41 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/users/:id
+ * Delete user (admin only)
+ */
+router.delete('/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try {
+    const deletedUser = await usersModel.deleteUser(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    // Handle foreign key constraint violations
+    if (error.code === '23503') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete user because they have related data (orders, etc.)'
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user'
     });
   }
 });
