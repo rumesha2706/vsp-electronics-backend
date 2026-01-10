@@ -8,7 +8,13 @@ if (!connectionString) {
   console.warn('⚠ No DATABASE_URL found in environment; DB operations will fail until set.');
 }
 
-const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  max: 10, // Limit maximum connections to prevent "super user reserved" errors
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
 async function query(text, params) {
   const client = await pool.connect();

@@ -154,90 +154,113 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
+// Initialize Database Tables
+const categoriesModel = require('./server/db/categories-model');
+const ordersModel = require('./server/db/orders-model'); // Assuming this exists or needed?
+// Just categories for now as that's where the issue is.
+
 // Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ API Server running at http://localhost:${PORT}`);
-  console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📖 Swagger Docs: http://localhost:${PORT}/api-docs`);
-  console.log(`🎯 Products API: http://localhost:${PORT}/api/products`);
-  console.log(`🏷️  Brands API: http://localhost:${PORT}/api/brands`);
-  console.log(`📦 Categories API: http://localhost:${PORT}/api/categories`);
-  console.log(`💬 Inquiries API: http://localhost:${PORT}/api/inquiries`);
-  console.log(`📱 WhatsApp Webhook: http://localhost:${PORT}/webhooks/whatsapp`);
-});
-
-// Socket.IO for Real-Time Analytics
-const { Server } = require('socket.io');
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true
+const startServer = async () => {
+  // Try to initialize tables, but don't crash if it fails (e.g. connection limits)
+  try {
+    // await categoriesModel.createTables(); // Commented out to prevent startup crash on connection limit
+    console.log('ℹ️  Skipping automatic table creation to save connections.');
+  } catch (err) {
+    console.warn('⚠️  Table initialization failed:', err.message);
   }
-});
 
-// Analytics State
-let activeUsers = 0;
-const productViewers = new Map(); // productId -> Set<socketId>
-const socketProductMap = new Map(); // socketId -> productId
+  try {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ API Server running at http://localhost:${PORT}`);
+      console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`📖 Swagger Docs: http://localhost:${PORT}/api-docs`);
+      console.log(`🎯 Products API: http://localhost:${PORT}/api/products`);
+      console.log(`🏷️  Brands API: http://localhost:${PORT}/api/brands`);
+      console.log(`📦 Categories API: http://localhost:${PORT}/api/categories`);
+      console.log(`💬 Inquiries API: http://localhost:${PORT}/api/inquiries`);
+      console.log(`📱 WhatsApp Webhook: http://localhost:${PORT}/webhooks/whatsapp`);
+    });
 
-io.on('connection', (socket) => {
-  activeUsers++;
-  io.emit('activeUsers', activeUsers);
-
-  // Send current stats immediately to new user
-  socket.emit('activeUsers', activeUsers);
-
-  socket.on('viewProduct', (productId) => {
-    // Ensure consistent type (convert to string for map keys if needed, but frontend sends number)
-    // We'll keep it as is, but be careful.
-
-    // Handle switching
-    const prevPid = socketProductMap.get(socket.id);
-    if (prevPid && prevPid !== productId) {
-      const viewers = productViewers.get(prevPid);
-      if (viewers) {
-        viewers.delete(socket.id);
-        // Emit update for previous product
-        io.emit('productViewers', { productId: prevPid, count: viewers.size });
+    // Socket.IO for Real-Time Analytics
+    const { Server } = require('socket.io');
+    const io = new Server(server, {
+      cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
       }
-    }
+    });
 
-    if (!productViewers.has(productId)) {
-      productViewers.set(productId, new Set());
-    }
-    productViewers.get(productId).add(socket.id);
-    socketProductMap.set(socket.id, productId);
+    // Analytics State
+    let activeUsers = 0;
+    const productViewers = new Map(); // productId -> Set<socketId>
+    const socketProductMap = new Map(); // socketId -> productId
 
-    // Emit update for current product
-    io.emit('productViewers', { productId, count: productViewers.get(productId).size });
-  });
+    io.on('connection', (socket) => {
+      activeUsers++;
+      io.emit('activeUsers', activeUsers);
 
-  socket.on('stopViewingProduct', (productId) => {
-    const viewers = productViewers.get(productId);
-    if (viewers) {
-      viewers.delete(socket.id);
-      io.emit('productViewers', { productId, count: viewers.size });
-    }
-    socketProductMap.delete(socket.id);
-  });
+      // Send current stats immediately to new user
+      socket.emit('activeUsers', activeUsers);
 
-  socket.on('disconnect', () => {
-    activeUsers--;
-    io.emit('activeUsers', activeUsers);
+      socket.on('viewProduct', (productId) => {
+        // Ensure consistent type (convert to string for map keys if needed, but frontend sends number)
+        // We'll keep it as is, but be careful.
 
-    // Clean up product views
-    const pid = socketProductMap.get(socket.id);
-    if (pid) {
-      const viewers = productViewers.get(pid);
-      if (viewers) {
-        viewers.delete(socket.id);
-        io.emit('productViewers', { productId: pid, count: viewers.size });
-      }
-      socketProductMap.delete(socket.id);
-    }
-  });
-});
+        // Handle switching
+        const prevPid = socketProductMap.get(socket.id);
+        if (prevPid && prevPid !== productId) {
+          const viewers = productViewers.get(prevPid);
+          if (viewers) {
+            viewers.delete(socket.id);
+            // Emit update for previous product
+            io.emit('productViewers', { productId: prevPid, count: viewers.size });
+          }
+        }
+
+        if (!productViewers.has(productId)) {
+          productViewers.set(productId, new Set());
+        }
+        productViewers.get(productId).add(socket.id);
+        socketProductMap.set(socket.id, productId);
+
+        // Emit update for current product
+        io.emit('productViewers', { productId, count: productViewers.get(productId).size });
+      });
+
+      socket.on('stopViewingProduct', (productId) => {
+        const viewers = productViewers.get(productId);
+        if (viewers) {
+          viewers.delete(socket.id);
+          io.emit('productViewers', { productId, count: viewers.size });
+        }
+        socketProductMap.delete(socket.id);
+      });
+
+      socket.on('disconnect', () => {
+        activeUsers--;
+        io.emit('activeUsers', activeUsers);
+
+        // Clean up product views
+        const pid = socketProductMap.get(socket.id);
+        if (pid) {
+          const viewers = productViewers.get(pid);
+          if (viewers) {
+            viewers.delete(socket.id);
+            io.emit('productViewers', { productId: pid, count: viewers.size });
+          }
+          socketProductMap.delete(socket.id);
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // Global error handlers
 process.on('uncaughtException', (err) => {
