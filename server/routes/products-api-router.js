@@ -92,10 +92,9 @@ router.get('/', async (req, res) => {
       const rows = await productsModel.getAll({ limit: parseInt(limit), offset: parseInt(offset), category, subcategory, brand, search });
       console.log('📍 First getAll returned:', rows ? rows.length : 'null');
       // Get total count matching filters
-      console.log('📍 Calling getAll 2 for count');
-      const allRows = await productsModel.getAll({ limit: 1000000, offset: 0, category, subcategory, brand, search });
-      console.log('📍 Second getAll returned:', allRows ? allRows.length : 'null');
-      const total = allRows.length;
+      console.log('📍 Calling getCount for total');
+      const total = await productsModel.getCount({ category, subcategory, brand, search });
+      console.log('📍 getCount returned:', total);
 
       return res.status(200).json({
         success: true,

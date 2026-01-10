@@ -134,6 +134,42 @@ async function getAll({ limit = 200, offset = 0, category, subcategory, brand, s
   return res.rows;
 }
 
+async function getCount({ category, subcategory, brand, search } = {}) {
+  let whereParts = [];
+  const params = [];
+  let i = 1;
+
+  if (category) {
+    whereParts.push(`category ILIKE $${i++}`);
+    params.push(`%${category}%`);
+  }
+  if (subcategory) {
+    if (subcategory === 'null') {
+      whereParts.push(`subcategory IS NULL`);
+    } else {
+      whereParts.push(`LOWER(subcategory) = LOWER($${i++})`);
+      params.push(subcategory);
+    }
+  }
+  if (brand) {
+    whereParts.push(`(brand ILIKE $${i} OR brand ILIKE $${i + 1})`);
+    params.push(brand);
+    params.push(brand.replace(/\s+/g, '-'));
+    i += 2;
+  }
+  if (search) {
+    whereParts.push(`(name ILIKE $${i} OR description ILIKE $${i})`);
+    params.push(`%${search}%`);
+    i++;
+  }
+
+  const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+  const sql = `SELECT COUNT(*) as total FROM products ${where}`;
+
+  const res = await db.query(sql, params);
+  return parseInt(res.rows[0].total, 10);
+}
+
 async function getById(id) {
   const res = await db.query('SELECT * FROM products WHERE id = $1', [id]);
   return res.rows[0];
@@ -274,5 +310,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getRecentPurchaseCount,
-  incrementViewCount
+  incrementViewCount,
+  getCount
 };

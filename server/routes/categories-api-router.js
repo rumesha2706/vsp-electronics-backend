@@ -47,9 +47,11 @@ router.get('/', async (req, res) => {
     }
 
     if (includeDetails === 'true') {
-      const withDetails = await Promise.all(
-        categories.map(cat => categoriesModel.getCategoryWithDetails(cat.id))
-      );
+      const withDetails = [];
+      for (const cat of categories) {
+        const details = await categoriesModel.getCategoryWithDetails(cat.id);
+        withDetails.push(details);
+      }
       return res.json(withDetails);
     }
 
