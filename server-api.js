@@ -164,6 +164,79 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 WhatsApp Webhook: http://localhost:${PORT}/webhooks/whatsapp`);
 });
 
+// Socket.IO for Real-Time Analytics
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+// Analytics State
+let activeUsers = 0;
+const productViewers = new Map(); // productId -> Set<socketId>
+const socketProductMap = new Map(); // socketId -> productId
+
+io.on('connection', (socket) => {
+  activeUsers++;
+  io.emit('activeUsers', activeUsers);
+
+  // Send current stats immediately to new user
+  socket.emit('activeUsers', activeUsers);
+
+  socket.on('viewProduct', (productId) => {
+    // Ensure consistent type (convert to string for map keys if needed, but frontend sends number)
+    // We'll keep it as is, but be careful.
+
+    // Handle switching
+    const prevPid = socketProductMap.get(socket.id);
+    if (prevPid && prevPid !== productId) {
+      const viewers = productViewers.get(prevPid);
+      if (viewers) {
+        viewers.delete(socket.id);
+        // Emit update for previous product
+        io.emit('productViewers', { productId: prevPid, count: viewers.size });
+      }
+    }
+
+    if (!productViewers.has(productId)) {
+      productViewers.set(productId, new Set());
+    }
+    productViewers.get(productId).add(socket.id);
+    socketProductMap.set(socket.id, productId);
+
+    // Emit update for current product
+    io.emit('productViewers', { productId, count: productViewers.get(productId).size });
+  });
+
+  socket.on('stopViewingProduct', (productId) => {
+    const viewers = productViewers.get(productId);
+    if (viewers) {
+      viewers.delete(socket.id);
+      io.emit('productViewers', { productId, count: viewers.size });
+    }
+    socketProductMap.delete(socket.id);
+  });
+
+  socket.on('disconnect', () => {
+    activeUsers--;
+    io.emit('activeUsers', activeUsers);
+
+    // Clean up product views
+    const pid = socketProductMap.get(socket.id);
+    if (pid) {
+      const viewers = productViewers.get(pid);
+      if (viewers) {
+        viewers.delete(socket.id);
+        io.emit('productViewers', { productId: pid, count: viewers.size });
+      }
+      socketProductMap.delete(socket.id);
+    }
+  });
+});
+
 // Global error handlers
 process.on('uncaughtException', (err) => {
   console.error('❌ UNCAUGHT EXCEPTION:', err.message);

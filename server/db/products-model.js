@@ -31,6 +31,9 @@ async function createTable() {
   await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS product_url TEXT;`);
 
   // Create a unique index on product_url to help prevent duplicate imports when product_url is provided
+  await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0;`);
+
+  // Create a unique index on product_url to help prevent duplicate imports when product_url is provided
   await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS products_product_url_unique ON products (product_url);`);
 }
 
@@ -40,8 +43,8 @@ async function clearAll() {
 
 async function insertProduct(p) {
   // Use product_url if provided — add ON CONFLICT to update when product_url matches to avoid duplicates
-  const sql = `INSERT INTO products (name, slug, description, category, subcategory, product_url, brand, price, image, in_stock, stock_count, is_hot, is_new, is_featured, rating, metadata)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+  const sql = `INSERT INTO products (name, slug, description, category, subcategory, product_url, brand, price, image, in_stock, stock_count, is_hot, is_new, is_featured, rating, metadata, view_count)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
                ON CONFLICT (product_url) DO UPDATE SET
                  name = EXCLUDED.name,
                  slug = EXCLUDED.slug,
@@ -76,7 +79,8 @@ async function insertProduct(p) {
     p.isNew || false,
     p.isFeatured || false,
     p.rating || null,
-    p.metadata || null
+    p.metadata || null,
+    0
   ];
 
   const res = await db.query(sql, values);
@@ -250,6 +254,17 @@ async function getRecentPurchaseCount(productId) {
   }
 }
 
+async function incrementViewCount(productId) {
+  try {
+    const sql = `UPDATE products SET view_count = COALESCE(view_count, 0) + 1 WHERE id = $1 RETURNING view_count`;
+    const res = await db.query(sql, [productId]);
+    return res.rows[0]?.view_count || 0;
+  } catch (err) {
+    console.error('Error incrementing view count:', err);
+    return 0;
+  }
+}
+
 module.exports = {
   createTable,
   clearAll,
@@ -258,5 +273,6 @@ module.exports = {
   getById,
   updateProduct,
   deleteProduct,
-  getRecentPurchaseCount
+  getRecentPurchaseCount,
+  incrementViewCount
 };
