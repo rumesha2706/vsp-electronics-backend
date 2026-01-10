@@ -98,20 +98,38 @@ router.post('/image', async (req, res) => {
     const fileName = generateFileName(`image${ext}`);
     const filePath = path.join(uploadDir, fileName);
 
-    fs.writeFileSync(filePath, buffer);
+    try {
+      ensureDirectoryExists(uploadDir);
+      fs.writeFileSync(filePath, buffer);
 
-    // Return full backend URL for frontend use
-    const relativePath = `/assets/images/${type}/${fileName}`;
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const backendUrl = `${protocol}://${host}${relativePath}`;
+      // Return full backend URL for frontend use
+      const relativePath = `/assets/images/${type}/${fileName}`;
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const backendUrl = `${protocol}://${host}${relativePath}`;
 
-    res.status(201).json({
-      success: true,
-      message: 'Image uploaded successfully',
-      imageUrl: backendUrl,
-      fileName: fileName
-    });
+      res.status(201).json({
+        success: true,
+        message: 'Image uploaded successfully',
+        imageUrl: backendUrl,
+        fileName: fileName
+      });
+    } catch (saveError) {
+      console.warn('⚠️ File system write failed (likely read-only environment). Falling back to Base64.', saveError.message);
+
+      // Fallback: Return Base64 Data URI
+      // This allows the database to store the image data directly
+      const mimeType = ext === '.svg' ? 'image/svg+xml' : `image/${ext.replace('.', '')}`;
+      const base64Fallback = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+      res.status(201).json({
+        success: true,
+        message: 'Image processed (DB storage fallback)',
+        imageUrl: base64Fallback,
+        fileName: fileName // Virtual filename
+      });
+    }
+
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({
