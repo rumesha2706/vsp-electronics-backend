@@ -236,9 +236,12 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ success: false, error: `Product with ID ${id} not found` });
       }
 
+      // Increment view count concurrently
+      productsModel.incrementViewCount(id).catch(err => console.error('Error incrementing view count:', err));
+
       // Get recent purchase count
       const recentPurchaseCount = await productsModel.getRecentPurchaseCount(id);
-      product.recentPurchaseCount = recentPurchaseCount;
+      product.recent_purchase_count = recentPurchaseCount;
 
       return res.status(200).json({ success: true, data: product });
     }

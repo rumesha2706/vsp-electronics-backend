@@ -286,7 +286,7 @@ router.get('/all', async (req, res) => {
 
     // Get featured products
     const featuredResult = await db.query(`
-      SELECT id, name, price, image, category, brand, rating, in_stock
+      SELECT id, name, price, image, category, brand, rating, in_stock as "inStock"
       FROM products
       WHERE is_featured = true AND in_stock = true
       ORDER BY created_at DESC
@@ -295,7 +295,7 @@ router.get('/all', async (req, res) => {
 
     // Get new products
     const newResult = await db.query(`
-      SELECT id, name, price, image, category, brand, rating, in_stock
+      SELECT id, name, price, image, category, brand, rating, in_stock as "inStock"
       FROM products
       WHERE is_new = true AND in_stock = true
       ORDER BY created_at DESC
@@ -304,7 +304,7 @@ router.get('/all', async (req, res) => {
 
     // Get top sellers by rating
     const topResult = await db.query(`
-      SELECT id, name, price, image, category, brand, rating, in_stock
+      SELECT id, name, price, image, category, brand, rating, in_stock as "inStock"
       FROM products
       WHERE rating IS NOT NULL AND rating > 0 AND in_stock = true
       ORDER BY rating DESC, created_at DESC
