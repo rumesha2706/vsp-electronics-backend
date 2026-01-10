@@ -230,9 +230,15 @@ async function deleteProduct(id) {
 async function getRecentPurchaseCount(productId) {
   try {
     const sql = `
-      SELECT COUNT(DISTINCT o.user_id) as count
+      SELECT COUNT(DISTINCT 
+        CASE 
+          WHEN o.user_id IS NOT NULL THEN CAST(o.user_id AS VARCHAR) 
+          ELSE osa.email 
+        END
+      ) as count
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN order_shipping_addresses osa ON o.id = osa.order_id
       WHERE oi.product_id = $1
       AND o.created_at > NOW() - INTERVAL '30 days'
     `;
