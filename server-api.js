@@ -56,6 +56,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // ⭐ STATIC FILES MUST BE BEFORE API ROUTES
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 app.use('/assets', express.static(path.join(__dirname, 'dist/vsp-electronics/browser/assets')));
+// Serve uploaded images specifically (for uploads folder)
+app.use('/assets/images', express.static(path.join(__dirname, 'public/assets/images')));
 
 // Health check endpoint
 app.get('/', (req, res) => {
