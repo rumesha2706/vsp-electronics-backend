@@ -43,7 +43,7 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
     const brand = await brandsModel.getBrandBySlug(slug);
-    
+
     if (!brand) {
       return res.status(404).json({
         success: false,
@@ -93,7 +93,7 @@ router.post('/', authenticateToken, async (req, res) => {
       name,
       slug,
       description,
-      image,
+      logo_url: image, // Map input image to logo_url
       metadata
     });
 
@@ -105,7 +105,7 @@ router.post('/', authenticateToken, async (req, res) => {
         name: brand.name,
         slug: brand.slug,
         description: brand.description,
-        image: brand.image,
+        image: brand.logo_url || brand.image,
         metadata: brand.metadata
       }
     });
@@ -133,7 +133,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       name,
       slug,
       description,
-      image,
+      logo_url: image, // Map input image to logo_url
       metadata
     });
 
@@ -152,7 +152,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         name: brand.name,
         slug: brand.slug,
         description: brand.description,
-        image: brand.image,
+        image: brand.logo_url || brand.image,
         metadata: brand.metadata
       }
     });

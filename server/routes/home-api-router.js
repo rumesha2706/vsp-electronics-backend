@@ -214,10 +214,10 @@ router.get('/top-sellers', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 12;
     const result = await db.query(`
-      SELECT id, name, price, image, category, brand, rating, in_stock
+      SELECT id, name, price, image, category, brand, rating, in_stock, stock_count
       FROM products
-      WHERE rating IS NOT NULL
-      ORDER BY rating DESC, created_at DESC
+      WHERE is_hot = true AND in_stock = true
+      ORDER BY created_at DESC
       LIMIT $1
     `, [limit]);
 
@@ -267,21 +267,21 @@ router.get('/all', async (req, res) => {
         SELECT id, name, slug, logo_url, website_url
         FROM public.brands
         ORDER BY name ASC
-        LIMIT 12
+        LIMIT 50
       `);
-      
+
       // Transform logo URLs to use placeholder if not provided
       brandsResult.rows = brandsResult.rows.map(brand => ({
         ...brand,
         logo_url: brand.logo_url || '/assets/images/placeholder.jpg'
       }));
-      
+
       console.log('Brands fetched:', brandsResult.rows.length);
     } catch (err) {
       console.error('Error fetching brands:', err.message);
       brandsResult = { rows: [] };
     }
-    
+
     console.log('Featured brands fetched:', brandsResult.rows.length);
 
     // Get featured products

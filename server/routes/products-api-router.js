@@ -11,12 +11,13 @@ const fs = require('fs');
 const path = require('path');
 
 // Database integration
+// Database integration
 const productsModel = require('../db/products-model');
-const USE_DB = !!process.env.DATABASE_URL;
+const USE_DB = !!(process.env.DATABASE_URL || process.env.PG_CONN);
 
 // Fallback in-memory store when DB not configured
 const products = new Map();
-let productIdCounter = 1; 
+let productIdCounter = 1;
 
 /**
  * @swagger
@@ -134,7 +135,7 @@ router.get('/', async (req, res) => {
 
     // Filter by brand
     if (br) {
-      filteredProducts = filteredProducts.filter(p => 
+      filteredProducts = filteredProducts.filter(p =>
         p.brand.toLowerCase() === br.toLowerCase()
       );
     }
@@ -142,7 +143,7 @@ router.get('/', async (req, res) => {
     // Search by name or description
     if (srch) {
       const searchLower = srch.toLowerCase();
-      filteredProducts = filteredProducts.filter(p => 
+      filteredProducts = filteredProducts.filter(p =>
         p.name.toLowerCase().includes(searchLower) ||
         p.description.toLowerCase().includes(searchLower)
       );
@@ -165,7 +166,7 @@ router.get('/', async (req, res) => {
     // Pagination
     const total = filteredProducts.length;
     const paginatedProducts = filteredProducts.slice(
-      parseInt(offset), 
+      parseInt(offset),
       parseInt(offset) + parseInt(limit)
     );
 
@@ -234,6 +235,11 @@ router.get('/:id', async (req, res) => {
       if (!product) {
         return res.status(404).json({ success: false, error: `Product with ID ${id} not found` });
       }
+
+      // Get recent purchase count
+      const recentPurchaseCount = await productsModel.getRecentPurchaseCount(id);
+      product.recentPurchaseCount = recentPurchaseCount;
+
       return res.status(200).json({ success: true, data: product });
     }
 
@@ -350,9 +356,9 @@ router.post('/download-image', async (req, res) => {
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
-    
+
     const productsDir = path.join(process.cwd(), 'public/assets/images/products', categorySlug);
-    
+
     if (!fs.existsSync(productsDir)) {
       fs.mkdirSync(productsDir, { recursive: true });
     }
@@ -364,7 +370,7 @@ router.post('/download-image', async (req, res) => {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .substring(0, 120);
-    
+
     const filename = `${productSlug}.jpg`;
     const filepath = path.join(productsDir, filename);
 
@@ -380,7 +386,7 @@ router.post('/download-image', async (req, res) => {
     // Download image from URL
     return new Promise((resolve) => {
       const downloadProtocol = imageUrl.startsWith('https') ? https : http;
-      
+
       downloadProtocol.get(imageUrl, { timeout: 10000 }, (response) => {
         if (response.statusCode !== 200) {
           return resolve(res.status(400).json({
@@ -403,7 +409,7 @@ router.post('/download-image', async (req, res) => {
         });
 
         file.on('error', (err) => {
-          fs.unlink(filepath, () => {}); // Delete incomplete file
+          fs.unlink(filepath, () => { }); // Delete incomplete file
           resolve(res.status(500).json({
             success: false,
             error: 'Failed to save image: ' + err.message
@@ -571,7 +577,7 @@ router.put('/:id', async (req, res) => {
 
       const updated = await productsModel.updateProduct(id, req.body);
       console.log(`✅ Product updated: ${updated.name} (ID: ${id})`);
-      
+
       return res.status(200).json({
         success: true,
         data: updated

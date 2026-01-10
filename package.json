@@ -14,7 +14,7 @@
     "categories:setup": "npm run categories:init && npm run categories:seed"
   },
   "engines": {
-    "node": "18.0.0"
+    "node": "20.x"
   },
   "private": true,
   "dependencies": {

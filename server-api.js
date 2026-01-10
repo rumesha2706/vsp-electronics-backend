@@ -4,10 +4,10 @@
  * Main entry point for Express.js API server
  */
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 
 // Load Swagger spec

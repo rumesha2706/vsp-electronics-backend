@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS products (
   price NUMERIC(10,2),
   image TEXT,
   in_stock BOOLEAN DEFAULT TRUE,
+  stock_count INTEGER DEFAULT 0,
   is_hot BOOLEAN DEFAULT FALSE,
   is_new BOOLEAN DEFAULT FALSE,
   rating NUMERIC(2,1),
@@ -39,8 +40,8 @@ async function clearAll() {
 
 async function insertProduct(p) {
   // Use product_url if provided — add ON CONFLICT to update when product_url matches to avoid duplicates
-  const sql = `INSERT INTO products (name, slug, description, category, subcategory, product_url, brand, price, image, in_stock, is_hot, is_new, is_featured, rating, metadata)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+  const sql = `INSERT INTO products (name, slug, description, category, subcategory, product_url, brand, price, image, in_stock, stock_count, is_hot, is_new, is_featured, rating, metadata)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
                ON CONFLICT (product_url) DO UPDATE SET
                  name = EXCLUDED.name,
                  slug = EXCLUDED.slug,
@@ -51,6 +52,7 @@ async function insertProduct(p) {
                  price = EXCLUDED.price,
                  image = EXCLUDED.image,
                  in_stock = EXCLUDED.in_stock,
+                 stock_count = EXCLUDED.stock_count,
                  is_hot = EXCLUDED.is_hot,
                  is_new = EXCLUDED.is_new,
                  is_featured = EXCLUDED.is_featured,
@@ -69,6 +71,7 @@ async function insertProduct(p) {
     p.price || null,
     p.image || null,
     p.inStock !== undefined ? p.inStock : true,
+    p.stockCount !== undefined ? p.stockCount : 0,
     p.isHot || false,
     p.isNew || false,
     p.isFeatured || false,
@@ -104,8 +107,11 @@ async function getAll({ limit = 200, offset = 0, category, subcategory, brand, s
     }
   }
   if (brand) {
-    whereParts.push(`brand ILIKE $${i++}`);
+    // Search for brand name OR slug-like version (spaces replaced by dashes)
+    whereParts.push(`(brand ILIKE $${i} OR brand ILIKE $${i + 1})`);
     params.push(brand);
+    params.push(brand.replace(/\s+/g, '-'));
+    i += 2;
   }
   if (search) {
     whereParts.push(`(name ILIKE $${i} OR description ILIKE $${i})`);
@@ -116,6 +122,10 @@ async function getAll({ limit = 200, offset = 0, category, subcategory, brand, s
   const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
   const sql = `SELECT * FROM products ${where} ORDER BY id DESC LIMIT $${i++} OFFSET $${i++}`;
   params.push(parseInt(limit, 10), parseInt(offset, 10));
+
+  console.log('Executing SQL:', sql);
+  console.log('Params:', params);
+
   const res = await db.query(sql, params);
   return res.rows;
 }
@@ -163,6 +173,18 @@ async function updateProduct(id, updates) {
     setClauses.push(`in_stock = $${paramIndex++}`);
     params.push(updates.inStock);
   }
+  if (updates.stockCount !== undefined) {
+    setClauses.push(`stock_count = $${paramIndex++}`);
+    params.push(updates.stockCount);
+
+    // Auto-update in_stock status if count is 0
+    // But ONLY if inStock wasn't explicitly provided in this update (to allow manual override if ever needed, though typical flow suggests 0 = out)
+    // Actually user requested: "When product is count is zero automatically make product as out of stock"
+    if (updates.stockCount === 0 && updates.inStock === undefined) {
+      setClauses.push(`in_stock = $${paramIndex++}`);
+      params.push(false);
+    }
+  }
   if (updates.isHot !== undefined) {
     setClauses.push(`is_hot = $${paramIndex++}`);
     params.push(updates.isHot);
@@ -205,6 +227,23 @@ async function deleteProduct(id) {
   return res.rows[0];
 }
 
+async function getRecentPurchaseCount(productId) {
+  try {
+    const sql = `
+      SELECT COUNT(DISTINCT o.user_id) as count
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE oi.product_id = $1
+      AND o.created_at > NOW() - INTERVAL '30 days'
+    `;
+    const res = await db.query(sql, [productId]);
+    return parseInt(res.rows[0]?.count || 0);
+  } catch (err) {
+    console.error('Error getting recent purchase count:', err);
+    return 0;
+  }
+}
+
 module.exports = {
   createTable,
   clearAll,
@@ -212,5 +251,6 @@ module.exports = {
   getAll,
   getById,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  getRecentPurchaseCount
 };

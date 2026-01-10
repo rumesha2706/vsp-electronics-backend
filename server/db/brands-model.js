@@ -16,11 +16,11 @@ CREATE TABLE IF NOT EXISTS brands (
 async function createTable() {
   try {
     await db.query(CREATE_TABLE_SQL);
-    
+
     // Ensure all columns exist (for existing tables)
     await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS image TEXT;`);
     await db.query(`ALTER TABLE brands ADD COLUMN IF NOT EXISTS metadata JSONB;`);
-    
+
     console.log('✓ Brands table created or already exists');
   } catch (error) {
     console.error('Error creating brands table:', error);
@@ -29,59 +29,63 @@ async function createTable() {
 }
 
 async function createBrand(brand) {
-  const { name, slug, description = null, image = null, metadata = null } = brand;
-  
+  // Map image input to logo_url to match DB schema
+  const { name, slug, description = null, logo_url = null, image = null, metadata = null } = brand;
+  const finalLogoUrl = logo_url || image;
+
   const sql = `
-    INSERT INTO brands (name, slug, description, image, metadata)
+    INSERT INTO brands (name, slug, description, logo_url, metadata)
     VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (slug) DO UPDATE SET
       name = EXCLUDED.name,
       description = EXCLUDED.description,
-      image = EXCLUDED.image,
+      logo_url = EXCLUDED.logo_url,
       metadata = EXCLUDED.metadata,
       updated_at = now()
     RETURNING *
   `;
 
-  const values = [name, slug, description, image, metadata];
+  const values = [name, slug, description, finalLogoUrl, metadata];
   const res = await db.query(sql, values);
   return res.rows[0];
 }
 
 async function getAllBrands() {
-  const sql = `SELECT * FROM brands ORDER BY name ASC`;
+  // Select logo_url as image for backward compatibility if needed, but primarily return logo_url
+  const sql = `SELECT *, logo_url as image FROM brands ORDER BY name ASC`;
   const res = await db.query(sql);
   return res.rows;
 }
 
 async function getBrandBySlug(slug) {
-  const sql = `SELECT * FROM brands WHERE slug = $1`;
+  const sql = `SELECT *, logo_url as image FROM brands WHERE slug = $1`;
   const res = await db.query(sql, [slug]);
   return res.rows[0] || null;
 }
 
 async function getBrandById(id) {
-  const sql = `SELECT * FROM brands WHERE id = $1`;
+  const sql = `SELECT *, logo_url as image FROM brands WHERE id = $1`;
   const res = await db.query(sql, [id]);
   return res.rows[0] || null;
 }
 
 async function updateBrand(id, brand) {
-  const { name, slug, description, image, metadata } = brand;
-  
+  const { name, slug, description, logo_url, image, metadata } = brand;
+  const finalLogoUrl = logo_url || image;
+
   const sql = `
     UPDATE brands SET
       name = COALESCE($2, name),
       slug = COALESCE($3, slug),
       description = COALESCE($4, description),
-      image = COALESCE($5, image),
+      logo_url = COALESCE($5, logo_url),
       metadata = COALESCE($6, metadata),
       updated_at = now()
     WHERE id = $1
-    RETURNING *
+    RETURNING *, logo_url as image
   `;
 
-  const values = [id, name, slug, description, image, metadata];
+  const values = [id, name, slug, description, finalLogoUrl, metadata];
   const res = await db.query(sql, values);
   return res.rows[0] || null;
 }
